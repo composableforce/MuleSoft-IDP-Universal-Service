@@ -1,0 +1,557 @@
+#%RAML 1.0
+title: MuleSoft IDP Universal 🌐 Service API
+version: v1
+mediaType: application/json
+protocols: HTTPS
+
+## Salesforce External Services hard codes to "https://localhost/api/{version}"
+##baseUri: https://{host}/api/{version}
+##baseUriParameters:
+##  host:
+##    type: string
+##    example: mulesoft-idp-universal-service-app-uupas5.m3jzw3-1.deu-c1.cloudhub.io
+
+securedBy:
+  - SecurityScheme-ClientIDEnforcement
+
+
+/idp/callback:
+  patch:
+    securedBy:
+      - SecurityScheme-ClientIDEnforcement-queryparam-apikey
+    displayName: 🤖 IDP patchCallback
+    responses:
+      "200":
+        body:
+          properties:
+            correlationId:
+              example: 22e79d23-f1f8-49e4-a542-644c55548141
+              type: string
+    queryParameters:
+      context:
+        description: Miscellaneous to save the context/keys of the origin of the doc
+        example: Salesforce Case Id
+        type: string
+        required: true
+    body:
+      application/json:
+        displayName: NoAuthCallbackBody
+        description: NoAuthCallbackBody
+        properties:
+          executionId:
+            type: field-executionId
+            required: true
+          actionId:
+            type: field-actionId
+            required: false
+          version:
+            type: field-actionVersion
+            required: false
+
+/idp/actions/{actionId}:
+  uriParameters:
+    actionId:
+      type: field-actionId
+
+  /reviewers:
+    get:
+      displayName: 🤖 IDP Get Action's Reviewers List
+      responses:
+        "200":
+          body:
+            items:
+              properties:
+                id:
+                  example: 4d4fda9b-b772-4085-ac61-078af3b54543
+                  type: field-uuid
+                name:
+                  example: Composable Force
+                  type: string
+                "type":
+                  example: USER
+                  type: string
+                email:
+                  example: gjeffcock@salesforce.com
+                  type: string
+
+  /versions/{actionVersion}:
+    uriParameters:
+      actionVersion:
+        type: field-actionVersion
+
+    /executions:
+      post:
+        displayName: 🤖 IDP postDocumentActionExecution
+        description: Submits a file for IDP processing
+        queryParameters:
+          mode:
+            description: Mode
+            displayName: Mode
+            enum:
+              - requestAndReply
+              - eventDrivenArchitecture
+            default: eventDrivenArchitecture
+            example: eventDrivenArchitecture
+            type: string
+            required: true
+
+        body:
+          application/json:
+            properties:
+              contentBase64:
+                description: encode the file content in base64
+                example: JVBERi0xLjcNCiWhs8XXDQoxIDAgb......
+                type: string
+                required: true
+              fileNameAndExtension:
+                description: File Name to be Processed https://docs.mulesoft.com/idp/quotas-and-limits
+                default: IDP-PO-CD656092-BurlingtonTextiles.pdf
+                example: IDP-PO-CD656092-BurlingtonTextiles.pdf
+                type: string
+                required: true
+              context:
+                type: field-context
+                required: false
+          multipart/form-data:
+            properties:
+              context:
+                description: Save Context Info
+                type: string
+                required: false
+              file:
+                description: fileContent has the actual payload.
+                type: file
+                fileTypes: ['application/pdf','image/png', 'image/jpeg']
+                required: true
+
+        responses:
+          201:
+            description: Created
+            body:
+              application/json: object-DocumentExecutionPostResponse
+          400:
+            description: Bad Request
+            body:
+              application/problem+json:
+                type: object-commonError
+          406:
+            description: Not Acceptable
+            body:
+              application/problem+json:
+                type: object-commonError
+          500:
+            description: Internal Server Error
+            body:
+              application/problem+json:
+                type: object-commonError
+
+      /{executionId}:
+        uriParameters:
+          executionId:
+            type: field-executionId
+        get:
+          displayName: 🤖 IDP getDocumentActionExecution
+          description: Retrieves the State & Result Data of a document action execution.
+          queryParameters:
+            valueOnly:
+              description: 🚨 Un-supported so use with Caution - Return Confidence levels when set to false
+              type: string
+              enum: # Bug in portal with Boolean
+                - "false"
+                - "true"
+              required: false
+          responses:
+            200:
+              description: Success
+              body:
+                application/json: object-DocumentExecutionGetResponse
+            404:
+              description: Not Found
+              body:
+                application/problem+json:
+                  type: object-commonError
+            406:
+              description: Not Acceptable
+              body:
+                application/problem+json:
+                  type: object-commonError
+            429:
+              description: Too Many Requests
+              body:
+                application/problem+json:
+                  type: object-commonError
+
+
+securitySchemes:
+  SecurityScheme-ClientIDEnforcement:
+    type: Pass Through
+    description: |-
+      Client ID based policies by default expect to obtain the client ID and secret as headers. To enforce this in the API definition a trait can be defined in RAML as shown below. https://docs.mulesoft.com/gateway/latest/policies-included-client-id-enforcement
+
+      traits:
+        - client-id-required:
+            headers:
+              client_id:
+                type: string
+              client_secret:
+                type: string
+            responses:
+              401:
+                description: Unauthorized or invalid client application credentials
+              500:
+                description: Bad response from authorization server, or WSDL SOAP Fault error
+    describedBy:
+      headers:
+        client_id:
+          example: 86bf456892314792982c5697c7d0da63
+          type: string
+        client_secret:
+          example: fA55275F9D4A43c286dd266DaDa9c68f
+          type: string
+      responses:
+        "401":
+          description: Unauthorized or invalid client application credentials
+        "500":
+          description: Bad response from authorization server, or WSDL SOAP Fault error
+
+  SecurityScheme-ClientIDEnforcement-queryparam-apikey:
+    displayName: 🛡️ MuleSoft Client ID Enforcement Policy via Query Params
+    type: Pass Through
+    description: |
+      ### Adding API Key to Query Parameters
+
+        Use Client ID Enforcement policy with API Manager
+
+        Custom Expression
+
+        Client ID Expression
+        DataWeave Expression to be used to extract the Client ID from API requests
+
+              ```
+                #[%dw 2.4 import fromBase64 from dw::core::Binaries import * from dw::core::Strings output application/java --- substringBefore(fromBase64(attributes.queryParams.apikey as String), ':')]
+
+              ```
+        Client Secret Expression
+        DataWeave Expression to be used to extract the Client Secret from API requests
+
+              ```
+                #[%dw 2.4 import fromBase64 from dw::core::Binaries import * from dw::core::Strings output application/java --- substringAfter(fromBase64(attributes.queryParams.apikey as String), ':')]
+
+              ```
+        Your apikey becomes ClientId:ClientSecret then Base64
+
+    describedBy:
+      responses:
+        "401":
+          body:
+            application/json:
+              properties:
+                error:
+                  example: Invalid Client
+                  type: string
+        "500":
+          body:
+            application/json:
+              properties:
+                error:
+                  example: Bad response from authorization server, or WSDL SOAP Fault error
+                  type: string
+
+      queryParameters:
+        apikey:
+          description: Client Id:Client Secret then base64 encoded
+          type: string
+          example: ODZiZjQ1Njg5MjMxNDc5Mjk4MmM1Njk3YzdkMGRhNjM6ZkE1NTI3NUY5RDRBNDNjMjg2ZGQyNjZEYURhOWM2OGY=
+
+description: |
+
+  mediaType: application/json
+
+  protocols: HTTPS
+
+  securedBy: 🛡️ MuleSoft Client ID Enforcement
+
+  | Author | Date | Description
+  | -------- | ------- | ------- |
+  | G.Jeffcock | 23rd June 2024 | Launched| 
+  |||| 
+  ||||
+
+  - **getDocumentActionExecution** Retrieves the result of a document action execution.
+  - **postDocumentActionExecution** Submits a document to IDP for processing.
+
+documentation:
+ - title: 📌 Why?
+   content: |
+     ### MuleSoft IDP Universal 🌐 API Service
+
+ - title: 📌 How?
+   content: |
+     ### MuleSoft IDP Universal 🌐 API Service
+
+
+
+types:
+
+  field-uuid:
+    type: string
+    pattern: "[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}"
+
+  field-actionId:
+    displayName: IDP Document Action Id
+    description: Published Document Action UUID
+    default: 9026458a-868d-40b6-90e0-6e80639e0aea
+    example: 9026458a-868d-40b6-90e0-6e80639e0aea
+    type: string
+    pattern: ^[{]?[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}[}]?$
+
+  field-actionVersion:
+    displayName: IDP Document Action Id Version
+    description: Document Action Version like 1.0.0
+    default: 1.1.0
+    example: 1.1.0
+    type: string
+    pattern: ^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9A-Za-z-][0-9A-Za-z-]*))*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$
+
+  field-context:
+    displayName: IDP Document Action Context
+    description: Save Context Info
+    example: my case key
+    type: string
+
+
+  field-executionId:
+    displayName: IDP Execution Id
+    description: IDP Execution Id returned after successful submission
+    default: 022c61de-9bfc-4a94-8a9c-43c5f8ac153e
+    example: 022c61de-9bfc-4a94-8a9c-43c5f8ac153e
+    type: string
+    pattern: ^[{]?[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}[}]?$
+
+  field-ExecutionStatus:
+    displayName: IDP Execution Status
+    description: |
+      ## [Execution Results Reference](https://docs.mulesoft.com/idp/automate-document-processing-with-the-idp-api#execution-status-reference).
+
+      When you query the results of an execution, the IDP API returns the status which can be any of the following:
+
+      - `ACKNOWLEDGED`: The document action execution request was received.
+      - `IN_PROGRESS`: The execution started.
+      - `RESULTS_PENDING`: The execution finished and IDP is processing the results.
+      - `MANUAL_VALIDATION_REQUIRED`: The execution finished but the results need manual validation.
+      - `FAILED`: The execution request finished unsuccessfully.
+      - `PARTIAL_SUCCESS`: The execution request finished but some sub-tasks failed.
+      - `SUCCEEDED`: The execution request finished successfully.
+    default: IN_PROGRESS
+    enum:
+      - ACKNOWLEDGED
+      - IN_PROGRESS
+      - RESULTS_PENDING
+      - MANUAL_VALIDATION_REQUIRED
+      - FAILED
+      - PARTIAL_SUCCESS
+      - SUCCEEDED
+    example: IN_PROGRESS
+    type: string
+
+  object-DocumentExecutionPostResponse:
+    displayName: IDP Document Submission Response Object
+    description: 
+    type: object
+    properties:
+      id:
+        type: field-executionId
+        required: true
+      documentName:
+        description: Document Name and Extension
+        type: string
+        example: IDP-PO-CD656092-BurlingtonTextiles.pdf
+        required: true
+      status:
+        type: field-ExecutionStatus
+        required: false
+    additionalProperties: false
+    example: {"id": "9026458a-868d-40b6-90e0-6e80639e0aea","documentName": "IDP-PO-CD656092-BurlingtonTextiles.pdf"}
+
+  object-commonError:
+    displayName: 🆘 IDP Common Error Response
+    description: IDP Common Error Response
+    properties:
+      status:
+        description: HTTP response status codes
+        default: 404
+        example: 404
+        type: number
+        format: int
+        required: true
+      title:
+        description: Error Title
+        example: Not Found
+        type: string
+        required: true
+      detail:
+        description: Error Details if available
+        example: "Action Id: 9026458a-868d-40b6-90e0-6e80639e0aea, Version: 1.1.0, Execution Id: 022c61de-9bfc-4a94-8a9c-43c5f8ac1531"
+        type: string
+        required: false
+    example: {"status": 404,"title": "Not Found"}
+    additionalProperties: false
+
+
+
+# Merged Response of ALL your Latest Versions of your Actions
+  object-DocumentExecutionGetResponse:
+    displayName: IDP Retrieve Execution Response Object
+    type: object
+    description:
+    properties:
+      pages?:
+        type: array
+        items: Page
+      id?:
+        type: field-executionId
+      documentName?:
+        type: string
+      prompts?:
+        type: Prompt
+      status?:
+        type: field-ExecutionStatus
+  Page:
+    type: object
+    properties:
+      tables?:
+        type: object
+        properties:
+          table1:
+            type: array
+            items:
+              type: object
+              properties:
+                unitPrice: Field
+                quantity: Field
+                productCode: Field
+                price: Field
+                description: Field
+            required: false
+      page?:
+        type: string
+      fields?:
+        type: object
+        properties:
+          total: Field
+          shipVia: Field
+          purchaseOrderDate: Field
+          subtotal: Field
+          purchaseOrderNumber: Field
+          parties:
+            type: object
+            properties:
+              vendor:
+                type: object
+                properties: {}
+                required: false
+              billTo:
+                type: object
+                properties: {}
+                required: false
+              buyer:
+                type: object
+                properties:
+                  country: Field
+                  zipCode: Field
+                  address: Field
+                  headerName: Field
+                  city: Field
+                  street: Field
+                  name: Field
+                  headerAddress: Field
+                  headerPhone: Field
+                  state: Field
+                  headerUrl: Field
+                  addressBlock: Field
+                required: false
+              shipTo:
+                type: object
+                properties:
+                  country: Field
+                  zipCode: Field
+                  address: Field
+                  city: Field
+                  street: Field
+                  name: Field
+                  state: Field
+                  addressBlock: Field
+                required: false
+            required: false
+          tax: Field
+          deliveryDate: Field
+          signatures:
+            type: array
+            items: Field
+            required: false
+      prompts?:
+        type: object
+        properties:
+          shippingHandlingCost: Prompt
+          customerNumber: Prompt
+          entitlements: Prompt
+          dateOfExpiry: Prompt
+          issuingAuthority: Prompt
+          otherNames: Prompt
+          dob: Prompt
+          surname: Prompt
+          licenceNumber: Prompt
+          dateOfIssue: Prompt
+  Prompt:
+    type: object
+    properties:
+      source?:
+        type: string
+      answer?: Field
+      prompt?:
+        type: string
+  Field:
+    type: object
+    properties:
+      geometry?:
+        type: object
+        properties:
+          width:
+            type: number
+            required: false
+          left:
+            type: number
+            required: false
+          height:
+            type: number
+            required: false
+          top:
+            type: number
+            required: false
+      value?:
+        type: string
+      confidenceScore?:
+        type: number
+  DocumentExecutionPostResponse:
+    type: object
+    properties:
+      documentName?:
+        type: string
+      id?:
+        type: string
+      status?:
+        type: string
+  DocumentExecutionGetResponse:
+    type: object
+    properties:
+      pages?:
+        type: array
+        items: Page
+      id?:
+        type: string
+      documentName?:
+        type: string
+      prompts?:
+        type: object
+        properties: {}
+      status?:
