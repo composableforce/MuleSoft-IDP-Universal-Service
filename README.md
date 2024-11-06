@@ -3,23 +3,23 @@ Scale and Reuse in a Universal IDP Solution
 
 ![image](https://github.com/user-attachments/assets/2085844b-7a97-498f-81fb-442428b2f8e2)
 
-![image](https://github.com/user-attachments/assets/af3464ce-f3bc-44fd-a416-412d1d224771)
-
-
 # MuleSoft IDP Universal 🌐 Service for Salesforce
 
-The following implementation details were used to create [Salesforce Order Management demonstration](https://play.goconsensus.com/665f9a9a-f75a-4d02-8eda-1234ecd62a73?preview=sales):   
-![][image1]  
+The following implementation details were used to create [Salesforce Order Management demonstration](https://www.linkedin.com/posts/georgejeffcock_what-is-idp-intelligent-document-processing-activity-7234212552753184768-8yiO):   
+![image](https://github.com/user-attachments/assets/53922dc9-2b7d-46ba-ae97-ac57a6a4fe96)
+
 ---
 
 ## Approach 1 \- (Business Logic within Salesforce)
 
 FYI: This approach is used in this example.  
-![][image2]
+![image](https://github.com/user-attachments/assets/e14d0dd7-19f5-4a2b-a807-a60403c02464)
+
 
 ## Approach 2 \- (Business Logic within MuleSoft)
 
-![][image3]
+![image](https://github.com/user-attachments/assets/a522f652-834b-4c3b-948e-781abde2ae38)
+
 
 In both approaches there are considerations when scaling a solution which has dictated the architectural decisions made:
 
@@ -49,16 +49,16 @@ In both approaches there are considerations when scaling a solution which has di
 ## MuleSoft Trigger On New Case Origin
 
 A great example of the use of  MuleSoft IDP is Salesforce [EmailToCase](https://help.salesforce.com/s/articleView?id=service.setting_up_email-to-case.htm&type=5), where we can set up [Trigger Flow](https://help.salesforce.com/s/articleView?id=platform.flow_concepts_trigger_record.htm&type=5) on Case Object   
-![][image4]  
+![image](https://github.com/user-attachments/assets/87f9b3bd-4fdb-4650-b33f-33384c4f9b39)
+
 Note the **Entry Conditions** should restrict on the **Origin Field** value that can automatically populated by the EmailToCase routine  
-![][image5]  
+![image](https://github.com/user-attachments/assets/0672b2e7-a28d-489d-8052-0b2a156598dc)
+
 The role of this triggered flow is to notify any Salesforce Platform Events **consumers** to a **New MuleSoft IDP Request** and therefore we must capture the bare minimum of detail required by the MuleSoft implementation to successfully call [MuleSoft IDP Document Action](https://docs.mulesoft.com/idp/automate-document-processing-with-the-idp-api#execute-the-published-document-actions)  such as:
 
 * MuleSoft\_IDP\_ActionName  
   * In reality both ActionId and ActionVersion are required but you could, like in this case, simplify and give your actions names that are equal to the names of the action in MuleSoft IDP. If you require Versioning Salesforce side you must then capture the Version Id and submit that also but with the Salesforce being **Strongly Typed** breaking changes will be seldom  
-    
-
-![][image6]
+![image](https://github.com/user-attachments/assets/24681c69-1895-4ebb-a8b3-b73dc26e4901)
 
 * MuleSoft\_IDP\_ContentVersionId  
   * MuleSoft will pull the document from Salesforce instead of Salesforce pushing the document as a binary object or Base64 which is [problematic](https://developer.salesforce.com/docs/atlas.en-us.apexcode.meta/apexcode/apex_rest_methods.htm?q=multipart) for Salesforce Flow architecture  
@@ -66,7 +66,7 @@ The role of this triggered flow is to notify any Salesforce Platform Events **co
   * Due to the asynchronous nature of this process we must record what record/object/process wanted the doc in question to be processed so the context field can be [Entity Key](https://help.salesforce.com/s/articleView?id=000385203&type=1) **Polymorphic**
 
 Salesforce Platform Event \- **MuleSoft IDP New**  
-![][image7]
+![image](https://github.com/user-attachments/assets/4fef9f72-cfa4-4c5c-a27b-19f406f55000)
 
 The logic could consist of 4 parts:
 
@@ -75,31 +75,32 @@ The logic could consist of 4 parts:
 3. Create the Platform Event  
 4. Update Case Comments to give the user an idea of progress
 
-![][image8]
+![image](https://github.com/user-attachments/assets/1a231771-57f1-447c-a364-d4c1b6990c19)
 
 Error Handle please but for brevity removed for screenshots
 
-![][image9]
+![image](https://github.com/user-attachments/assets/d064f56b-c560-446c-970a-1db20f0d6b7f)
 
 ---
 
 Over to [MuleSoft IDP Universal 🌐 Service](https://github.com/composableforce/MuleSoft-IDP-Universal-Service)
 
 ## MuleSoft IDP Universal 🌐 Service \- ListenForNewIDPRequests
+![image](https://github.com/user-attachments/assets/6981a119-074a-41f2-a0bf-b701043d5f9b)
 
-![][image10]
 
 This flow should not need any changes as it has been built with configuration and not coding in mind. 
 
-1. Subscribes to channel /event/MuleSoft\_IDP\_New\_\_e and as long as you have [defined the event as above](#heading=h.3sceepfa76vf) no changes are required![][image11]
+1. Subscribes to channel /event/MuleSoft\_IDP\_New\_\_e and as long as you have [defined the event as above](#heading=h.3sceepfa76vf) no changes are required! ![image](https://github.com/user-attachments/assets/4e6b8e7b-a9ef-4ef1-a8ae-06c8deb6584c)
+
 
 2. ##### Get **Action Keys by Name** uses [MuleSoft IDP Platform API](https://github.com/composableforce/MuleSoft-IDP-Platform-API) which is the current **undocumented** Platform API powering the MuleSoft IDP UI which you are free to use at your own risk or just use a Choice component as hard coded the Action Id and Action Version you want depending on received ActionName
 
 3. Get the Salesforce Doc from Content Version Object
 
 4. #### **Generate the [Callback URL](https://docs.mulesoft.com/idp/automate-document-processing-with-the-idp-api#callback-url)** \- Small dataweave snippet to inform MuleSoft IDP platform to update this MuleSoft Application with any updates and use use an api key in the query parameter for security while also recording the Context of the submission within the query parameters {#generate-the-callback-url---small-dataweave-snippet-to-inform-mulesoft-idp-platform-to-update-this-mulesoft-application-with-any-updates-and-use-use-an-api-key-in-the-query-parameter-for-security-while-also-recording-the-context-of-the-submission-within-the-query-parameters}
+![image](https://github.com/user-attachments/assets/d2705ab6-52b3-43da-86a3-d5136ce821bc)
 
-![][image12]
 
 5. [Submits](https://docs.mulesoft.com/idp/automate-document-processing-with-the-idp-api#execute-the-published-document-actions) an action version document execution  
    1. Please note no need to use MultiPart in the dataweave  
