@@ -1,8 +1,3 @@
-# MuleSoft IDP Universal 🌐 Service
-Scale and Reuse in a Universal IDP Solution
-
-![image](https://github.com/user-attachments/assets/2085844b-7a97-498f-81fb-442428b2f8e2)
-
 # MuleSoft IDP Universal 🌐 Service for Salesforce
 
 The following implementation details were used to create [Salesforce Order Management demonstration](https://www.linkedin.com/posts/georgejeffcock_what-is-idp-intelligent-document-processing-activity-7234212552753184768-8yiO):   
@@ -106,20 +101,24 @@ This flow should not need any changes as it has been built with configuration an
    1. Please note no need to use MultiPart in the dataweave  
    2. Please note this implementation uses [MuleSoft IDP Universal 🌐 REST Smart Connector 🔌](https://github.com/composableforce/MuleSoft-IDP-Universal-REST-Smart-Connector)  which allows us any action to be submitted as the Action keys have been modeled as URI parameters
 
-![][image13]
+![image](https://github.com/user-attachments/assets/878c2edd-bb92-4a23-9d28-56c2bfc9a023)
+
 
 6. Publish to Salesforce Platform Event **/event/MuleSoft\_IDP\_StatusUpdate\_\_e** of success or failure of submission (Not failure of the doc processing but was the submission accepted or not)
 
-![][image14]
+![image](https://github.com/user-attachments/assets/92a30394-395d-4d11-b01c-0ae306b33685)
+
 
 Salesforce Platform Event \- **MuleSoft IDP Status Update**  
-![][image15]
+![image](https://github.com/user-attachments/assets/b7657873-894a-40b2-8b91-c08dad305e64)
+
 
 ---
 
 ## MuleSoft IDP Universal 🌐 Service \- processCallback
 
-![][image16]
+![image](https://github.com/user-attachments/assets/e85f0112-5274-4b14-af0a-efecdfc9a741)
+
 
 This flow should not need any changes as it has been built with configuration and not coding in mind. 
 
@@ -129,8 +128,8 @@ This flow should not need any changes as it has been built with configuration an
    2. Note this subsection is within an Async Component as MuleSoft IDP does not currently error handle or retry on failed PATCH  
 3. This implementation as specified before has dynamic lookup for Action Names as it is the Name of the Action that the consumer (Salesforce) knows the Actions by and not Action Id and Action Version, this needs to be recorded on the Update Platform Event  
 4. Publish to Salesforce Platform Event **/event/MuleSoft\_IDP\_StatusUpdate\_\_e** of success or failure of submission processing. In this implementation (no business logic) the MuleSoft Service is there to submit and record status updates for Salesforce then to process accordingly
+![image](https://github.com/user-attachments/assets/26ca4532-f1d5-419e-8740-c7b045d7239a)
 
-![][image17]
 
 5. Optional: Return correlationId for future reference
 
@@ -144,7 +143,8 @@ The role of this [Platform Event triggered flow](https://developer.salesforce.co
 
 * Note it is not where we process Successful results, we have separated that out to separate platform events (Flow References not supported yet in Platform Triggered Flows) allowing us to build in isolation and safety of processing each type of doc not affecting another doc processing
 
-![][image18]
+![image](https://github.com/user-attachments/assets/931b1049-f3e5-40e8-a097-c7015aed1f54)
+
 
 1. Determine course of action depending on [Execution Results](https://docs.mulesoft.com/idp/automate-document-processing-with-the-idp-api#execution-status-reference) including bespoke errors you may or not return within the MuleSoft tier like “Failed Submission”  
 * ACKNOWLEDGED: The document action execution request was received.  
@@ -155,8 +155,8 @@ The role of this [Platform Event triggered flow](https://developer.salesforce.co
 * PARTIAL\_SUCCESS: The execution request finished but some sub-tasks failed.  
 * SUCCEEDED: The execution request finished successfully.  
 2. A catch all to handle any unrecognized execution status. Raising an Error that stops a flow can be a little hard in flow currently so feel free to use the following apex class:
+![image](https://github.com/user-attachments/assets/c12e5179-c994-46ef-a40c-784b33fa111a)
 
-![][image19]
 
 | public class MuleSoftRaiseErrorClass {     @InvocableMethod(label='Raise Error' description='Raises a custom error based on input' iconName='slds:custom:custom82')     public static void raiseError(List\<Request\> requests) {         for (Request req : requests) {             if (req.raiseError) {                 throw new CustomException(req.errorMessage);             }         }     }      public class CustomException extends Exception {}      public class Request {         @InvocableVariable(required=true description='Indicate if an error should be raised')         public Boolean raiseError;                  @InvocableVariable(required=true description='The error message to raise')         public String errorMessage;     } } |
 | :---- |
@@ -164,15 +164,18 @@ The role of this [Platform Event triggered flow](https://developer.salesforce.co
 3. On MANUAL\_VALIDATION\_REQUIRED: we can use an undocumented API to fetch the reviewers for a particular MuleSoft IDP Action. This API has been exposed  in [MuleSoft IDP Universal 🌐 Service](https://github.com/composableforce/MuleSoft-IDP-Universal-Service)  
 4. Iterate around the returned list of reviewers and send them an email notifying them of an awaiting review task
 
-![][image20]
+![image](https://github.com/user-attachments/assets/07544da8-d851-4a4a-92d8-9ce97e860f41)
+
 
 5. When SUCCEEDED determine which doc to process based on the Salesforce Platform Event Action Name. We know see the [benefit of Action Names](#bookmark=id.c3ryymd022a6) as we do not need [any fuzzy logic here](#bookmark=id.7f744ocpnjlh)  
 6. Publish to Salesforce Platform Event **MuleSoft IDP Result myActionName** of success and therefore record the details for the triggered flow to get the result (Json Result) to process in isolation and dedicated flow for the specific doc  
-   ![][image21]
+![image](https://github.com/user-attachments/assets/573ca45a-6b90-46c1-bd15-53b8b415a0c2)
+
 
 7. Optional \- The Context of the IDP submission will differ between submission requests from the Salesforce Platform so here we determine using the Context field to see if the origin was a Case and therefore 8\. Update the Case Notes
 
-![][image22]
+![image](https://github.com/user-attachments/assets/2944d005-2870-4795-80d7-09a0ec0c58a8)
+
 
 ---
 
@@ -184,7 +187,8 @@ The role of this [Platform Event triggered flow](https://developer.salesforce.co
 
 Why dedicated flow?: Currently building flows around invocable actions leaves you open to maintenance headaches see the following coming attraction \!
 
-| Dreamforce 2024 (Remember always subject to change) ![][image23] “Allow invocable action developers to create new versions of their actions with breaking changes (behavior, input/output parameter changes) without breaking existing consumers, something that’s not possible today. Deprecate older versions of actions so they are no longer usable in new flows and other consumers. Provide path to update consumers to use newer versions of actions. *Enables invocable action developers to evolve their actions over time in ways that are not possible today without creating entirely new actions. Consumers can then update to newer versions when they are ready.”*  |
+| Dreamforce 2024 (Remember always subject to change) ![image](https://github.com/user-attachments/assets/b49d9858-80fc-4150-9772-e138e1f55019)
+ “Allow invocable action developers to create new versions of their actions with breaking changes (behavior, input/output parameter changes) without breaking existing consumers, something that’s not possible today. Deprecate older versions of actions so they are no longer usable in new flows and other consumers. Provide path to update consumers to use newer versions of actions. *Enables invocable action developers to evolve their actions over time in ways that are not possible today without creating entirely new actions. Consumers can then update to newer versions when they are ready.”*  |
 | :---- |
 
 Secondly consider this statement:: [Salesforce’s strongly-typed nature, with strict schema references for objects and fields, creates significant challenges when handling dynamic JSON results from IDP](https://developer.salesforce.com/docs/atlas.en-us.apexcode.meta/apexcode/apex_intro_what_is_apex.htm?q=Rigorous)
@@ -199,27 +203,28 @@ To transform the data you have 3 choices
 * Pure Apex  
 * Dataweave for Apex (super powerful)
 
-![][image24]  
+![image](https://github.com/user-attachments/assets/832557b2-051c-40ce-b557-4b971db8f6bb)
+
 Note: You will see an APEX class called “Get Product and Pricebook Entry” in our flow which executes a SOQL join which will again be supported:
 
-|  Dreamforce 2024 (Remember always subject to change) ![][image25] One Get Records, Multiple Objects Combine multiple related objects (i.e. Opportunities, Products and Pricebooks) into a single variable in your Flow.  |
+|  Dreamforce 2024 (Remember always subject to change) ![image](https://github.com/user-attachments/assets/12e6aee6-8b45-4791-947c-7a0badfda976)
+ One Get Records, Multiple Objects Combine multiple related objects (i.e. Opportunities, Products and Pricebooks) into a single variable in your Flow.  |
 | :---- |
 
 **The point being build now in Flow, adopt Flow and it will allow greater democratization of who will be able to build and maintain these MuleSoft IDP Json results, if you build in Apex it is harder to change course.**
 
 For your comparison Approach 2 with the business logic inside MuleSoft also requires work, you have to make a decision where and who should do the transformation and importantly who will maintain this over time  
-![][image26]
+![image](https://github.com/user-attachments/assets/e2e62290-dab7-4c98-89b3-b4c8143d9b56)
+
 
 ---
 
 ## Appendix
 
 ## External Service & Named Credentials Screenshots
+![image](https://github.com/user-attachments/assets/103f1bc8-60a3-4edd-8148-20019f5db1f3)
+![image](https://github.com/user-attachments/assets/ad868dd1-d58c-4e2b-8a50-dc015892ae51)
+![image](https://github.com/user-attachments/assets/4416bd2e-81e6-462f-904c-756272f682fe)
 
-![][image27]
 
-![][image28]
 
-![][image29]
-
-![][image30]
